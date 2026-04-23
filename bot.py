@@ -20,11 +20,13 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# пользователи, которые ждут ввод списка
-waiting_users = set()
+# состояние пользователей (ожидание списка)
+waiting_users = {}
 
 
-# старт
+# ========================
+# /start
+# ========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🎲 Бросить кубик", callback_data="roll_start")]
@@ -37,20 +39,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# обработка кнопки
+# ========================
+# кнопка
+# ========================
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     user_id = query.from_user.id
-    waiting_users.add(user_id)
+
+    # защита от спама
+    if user_id in waiting_users:
+        return
+
+    waiting_users[user_id] = True
 
     await query.message.reply_text(
         "Отправь список (каждый пункт с новой строки)"
     )
 
 
-# генерация результата
+# ========================
+# генерация
+# ========================
 def process_items(items):
     result = []
     for item in items:
@@ -59,20 +70,24 @@ def process_items(items):
     return "\n".join(result)
 
 
-# команда /roll
+# ========================
+# /roll
+# ========================
 async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or ""
 
-    # убираем /roll и /roll@bot
+    # убираем команду
     text = text.replace("/roll", "")
     if context.bot.username:
         text = text.replace(f"@{context.bot.username}", "")
 
     text = text.strip()
 
+    # если написали в строку
     if text:
         items = text.replace(",", " ").split()
     else:
+        # если список с новой строки
         parts = update.message.text.split("\n")[1:]
         items = [i.strip() for i in parts if i.strip()]
 
@@ -83,15 +98,15 @@ async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(process_items(items))
 
 
-# обработка через кнопку (режим ожидания)
+# ========================
+# обработка после кнопки
+# ========================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
 
-    # если пользователь НЕ в режиме ожидания — игнор
+    # если не ждём — игнор
     if user_id not in waiting_users:
         return
-
-    waiting_users.remove(user_id)
 
     text = update.message.text or ""
     lines = text.split("\n")
@@ -100,16 +115,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not items:
         return
 
+    # УБИРАЕМ из ожидания (важно!)
+    waiting_users.pop(user_id, None)
+
     await update.message.reply_text(process_items(items))
 
-    # попытка удалить сообщение пользователя (если бот админ)
+    # удаление сообщения пользователя (если бот админ)
     try:
         await update.message.delete()
     except:
         pass
 
 
+# ========================
 # запуск
+# ========================
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -117,7 +137,7 @@ app.add_handler(CommandHandler("roll", roll))
 
 app.add_handler(CallbackQueryHandler(button_handler))
 
-# только текст БЕЗ команд
+# только текст без команд
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
 app.run_polling()
