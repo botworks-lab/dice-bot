@@ -26,7 +26,7 @@ waiting_users = {}
 
 
 # ========================
-# /start
+# /start (НЕ УДАЛЯЕМ)
 # ========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -58,7 +58,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✍️ Отправь список (каждый пункт с новой строки)"
     )
 
-    # удаляем подсказку через 2 сек
+    # удаляем ТОЛЬКО это сообщение
     context.application.create_task(delete_later(msg, 2))
 
 
