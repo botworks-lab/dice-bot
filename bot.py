@@ -2,7 +2,6 @@ import random
 import os
 import logging
 import time
-import asyncio
 
 from telegram import (
     Update,
@@ -22,6 +21,7 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
+# user_id: {"time": ..., "msg_id": ...}
 waiting_users = {}
 
 
@@ -49,22 +49,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
 
-    if user_id in waiting_users and time.time() - waiting_users[user_id] < 3:
+    # защита от спама
+    if user_id in waiting_users and time.time() - waiting_users[user_id]["time"] < 3:
         return
-
-    waiting_users[user_id] = time.time()
 
     msg = await query.message.reply_text(
         "✍️ Отправь список (каждый пункт с новой строки)"
     )
 
-    # 👇 просто ждём и удаляем (без фоновых задач)
-    await asyncio.sleep(2)
-
-    try:
-        await msg.delete()
-    except:
-        pass
+    waiting_users[user_id] = {
+        "time": time.time(),
+        "msg_id": msg.message_id
+    }
 
 
 # ========================
@@ -94,14 +90,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not items:
         return
 
-    waiting_users.pop(user_id, None)
+    data = waiting_users.pop(user_id)
 
-    # удаляем сообщение пользователя
+    # удалить сообщение пользователя
     try:
         await update.message.delete()
     except:
         pass
 
+    # удалить подсказку
+    try:
+        await context.bot.delete_message(
+            chat_id=update.message.chat_id,
+            message_id=data["msg_id"]
+        )
+    except:
+        pass
+
+    # отправить результат
     await update.message.reply_text(process_items(items))
 
 
