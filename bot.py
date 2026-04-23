@@ -13,17 +13,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+
+    # имя бота
+    bot_username = context.bot.username
+
+    # если это группа — проверяем упоминание или команду
+    if update.message.chat.type != "private":
+        if not (text.startswith("/roll") or f"@{bot_username}" in text):
+            return
+
+    # убираем команду и имя бота из текста
+    text = text.replace("/roll", "")
+    text = text.replace(f"@{bot_username}", "").strip()
+
     lines = text.split("\n")
 
-    # по умолчанию d6
     dice_max = 6
-
-    if context.args:
-        try:
-            dice_max = int(context.args[0])
-        except:
-            pass
-
     result = []
 
     for line in lines:
