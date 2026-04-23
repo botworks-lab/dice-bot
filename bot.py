@@ -21,7 +21,6 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# user_id: {"time": ..., "msg_id": ...}
 waiting_users = {}
 
 
@@ -49,8 +48,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
 
-    # защита от спама
-    if user_id in waiting_users and time.time() - waiting_users[user_id]["time"] < 3:
+    # 🔒 БЛОКИРОВКА (главное исправление)
+    if user_id in waiting_users:
         return
 
     msg = await query.message.reply_text(
@@ -58,7 +57,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     waiting_users[user_id] = {
-        "time": time.time(),
         "msg_id": msg.message_id
     }
 
@@ -92,13 +90,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = waiting_users.pop(user_id)
 
-    # удалить сообщение пользователя
+    # удаляем сообщение пользователя
     try:
         await update.message.delete()
     except:
         pass
 
-    # удалить подсказку
+    # удаляем подсказку
     try:
         await context.bot.delete_message(
             chat_id=update.message.chat_id,
@@ -107,7 +105,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    # отправить результат
     await update.message.reply_text(process_items(items))
 
 
