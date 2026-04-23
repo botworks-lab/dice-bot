@@ -12,33 +12,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+    # аргументы после команды
+    args = context.args
 
-    # имя бота
-    bot_username = context.bot.username
+    # если написали /roll меч щит
+    if args:
+        items = args
+    else:
+        # если список с новой строки
+        text = update.message.text
+        parts = text.split("\n")[1:]
+        items = [i.strip() for i in parts if i.strip()]
 
-    # если это группа — проверяем упоминание или команду
-    if update.message.chat.type != "private":
-        if not (text.startswith("/roll") or f"@{bot_username}" in text):
-            return
+    if not items:
+        await update.message.reply_text("Напиши список после /roll")
+        return
 
-    # убираем команду и имя бота из текста
-    text = text.replace("/roll", "")
-    text = text.replace(f"@{bot_username}", "").strip()
-
-    lines = text.split("\n")
-
-    dice_max = 6
     result = []
 
-    for line in lines:
-        item = line.strip()
-        if item:
-            dice = random.randint(1, dice_max)
-            result.append(f"{item} — 🎲 {dice}")
+    for item in items:
+        dice = random.randint(1, 6)
+        result.append(f"{item} — 🎲 {dice}")
 
-    if result:
-        await update.message.reply_text("\n".join(result))
+    await update.message.reply_text("\n".join(result))
 
 app = ApplicationBuilder().token(TOKEN).build()
 
