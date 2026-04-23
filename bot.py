@@ -26,7 +26,7 @@ waiting_users = {}
 
 
 # ========================
-# /start (НЕ УДАЛЯЕМ)
+# /start
 # ========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -58,14 +58,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✍️ Отправь список (каждый пункт с новой строки)"
     )
 
-    # удаляем ТОЛЬКО это сообщение
-    context.application.create_task(delete_later(msg, 2))
+    # 👇 просто ждём и удаляем (без фоновых задач)
+    await asyncio.sleep(2)
 
-
-async def delete_later(message, delay):
-    await asyncio.sleep(delay)
     try:
-        await message.delete()
+        await msg.delete()
     except:
         pass
 
