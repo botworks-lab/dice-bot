@@ -1,7 +1,6 @@
 import random
 import os
 import logging
-import time
 
 from telegram import (
     Update,
@@ -48,7 +47,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
 
-    # 🔒 БЛОКИРОВКА (главное исправление)
     if user_id in waiting_users:
         return
 
@@ -90,13 +88,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = waiting_users.pop(user_id)
 
-    # удаляем сообщение пользователя
+    # ✅ СНАЧАЛА отправляем результат
+    await update.message.reply_text(process_items(items))
+
+    # ❌ потом удаляем
     try:
         await update.message.delete()
     except:
         pass
 
-    # удаляем подсказку
     try:
         await context.bot.delete_message(
             chat_id=update.message.chat_id,
@@ -104,8 +104,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except:
         pass
-
-    await update.message.reply_text(process_items(items))
 
 
 # ========================
