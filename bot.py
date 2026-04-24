@@ -20,12 +20,11 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# user_id: {dice, msg_id, form_msg_id}
 waiting_users = {}
 
 
 # ========================
-# /roll — открывает "форму"
+# /roll — сразу выбор кубика
 # ========================
 async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -41,10 +40,9 @@ async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    # сохраняем ID
     waiting_users[update.message.from_user.id] = {
         "start_msg_id": msg.message_id,
-        "user_cmd_id": update.message.message_id
+        "user_start_id": update.message.message_id
     }
 
 
@@ -58,24 +56,16 @@ async def select_dice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     dice = int(query.data.split("_")[1])
 
-    # сообщение формы
-    form_msg = await query.message.reply_text(
-        f"✍️ Введи список (кубик d{dice})\n(каждый пункт с новой строки)"
-    )
+    if user_id not in waiting_users:
+        waiting_users[user_id] = {}
 
-    # можно закрепить (если бот админ)
-    try:
-        await context.bot.pin_chat_message(
-            chat_id=query.message.chat_id,
-            message_id=form_msg.message_id,
-            disable_notification=True
-        )
-    except:
-        pass
+    msg = await query.message.reply_text(
+        f"✍️ Отправь список (кубик d{dice})"
+    )
 
     waiting_users[user_id].update({
         "dice": dice,
-        "form_msg_id": form_msg.message_id
+        "msg_id": msg.message_id
     })
 
 
@@ -91,7 +81,7 @@ def process_items(items, dice):
 
 
 # ========================
-# обработка формы
+# обработка списка
 # ========================
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
@@ -102,7 +92,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = waiting_users.pop(user_id)
 
     text = update.message.text or ""
-    items = [i.strip() for i in text.split("\n") if i.strip()]
+    lines = text.split("\n")
+    items = [i.strip() for i in lines if i.strip()]
 
     if not items:
         return
@@ -116,17 +107,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     # удаление сообщений
-    for msg_id in [
-        update.message.message_id,
-        data.get("start_msg_id"),
-        data.get("user_cmd_id"),
-        data.get("form_msg_id")
-    ]:
+    try:
+        await update.message.delete()
+    except:
+        pass
+
+    for key in ["msg_id", "start_msg_id", "user_start_id"]:
         try:
-            if msg_id:
+            if data.get(key):
                 await context.bot.delete_message(
                     chat_id=update.message.chat_id,
-                    message_id=msg_id
+                    message_id=data.get(key)
                 )
         except:
             pass
