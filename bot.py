@@ -20,14 +20,13 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# user_id: данные пользователя
 waiting_users = {}
 
 
 # ========================
-# /start — сразу выбор кубика
+# /roll — сразу выбор кубика
 # ========================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton("d6", callback_data="dice_6"),
@@ -101,7 +100,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     dice = data.get("dice", 6)
 
-    # отправка без reply
+    # отправка результата
     await context.bot.send_message(
         chat_id=update.message.chat_id,
         text=process_items(items, dice)
@@ -129,7 +128,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========================
 app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("roll", roll))
 app.add_handler(CallbackQueryHandler(select_dice, pattern="dice_"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
