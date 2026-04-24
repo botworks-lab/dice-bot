@@ -20,6 +20,7 @@ logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
+# user_id: {msg_id, start_msg_id}
 waiting_users = {}
 
 
@@ -32,10 +33,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(
+    bot_msg = await update.message.reply_text(
         "🎲 Бот для бросков кубиков\n\nНажми кнопку 👇",
         reply_markup=reply_markup
     )
+
+    # сохраняем сообщение /start и сообщение бота
+    waiting_users[update.message.from_user.id] = {
+        "start_msg_id": update.message.message_id,
+        "bot_msg_id": bot_msg.message_id
+    }
 
 
 # ========================
@@ -47,27 +54,27 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
 
-    if user_id in waiting_users:
+    if user_id in waiting_users and "waiting" in waiting_users[user_id]:
         return
 
     msg = await query.message.reply_text(
         "✍️ Отправь список (каждый пункт с новой строки)"
     )
 
-    waiting_users[user_id] = {
-        "msg_id": msg.message_id
-    }
+    if user_id not in waiting_users:
+        waiting_users[user_id] = {}
+
+    waiting_users[user_id]["waiting"] = True
+    waiting_users[user_id]["hint_msg_id"] = msg.message_id
 
 
 # ========================
 # генерация
 # ========================
 def process_items(items):
-    result = []
-    for item in items:
-        dice = random.randint(1, 6)
-        result.append(f"{item} — 🎲 {dice}")
-    return "\n".join(result)
+    return "\n".join(
+        f"{item} — 🎲 {random.randint(1, 6)}" for item in items
+    )
 
 
 # ========================
@@ -76,7 +83,7 @@ def process_items(items):
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
 
-    if user_id not in waiting_users:
+    if user_id not in waiting_users or "waiting" not in waiting_users[user_id]:
         return
 
     text = update.message.text or ""
@@ -88,19 +95,38 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = waiting_users.pop(user_id)
 
-    # ✅ СНАЧАЛА отправляем результат
+    # 1. отправляем результат
     await update.message.reply_text(process_items(items))
 
-    # ❌ потом удаляем
+    # 2. удаляем всё лишнее
     try:
-        await update.message.delete()
+        await update.message.delete()  # список
     except:
         pass
 
+    # подсказка
     try:
         await context.bot.delete_message(
             chat_id=update.message.chat_id,
-            message_id=data["msg_id"]
+            message_id=data.get("hint_msg_id")
+        )
+    except:
+        pass
+
+    # сообщение с кнопкой
+    try:
+        await context.bot.delete_message(
+            chat_id=update.message.chat_id,
+            message_id=data.get("bot_msg_id")
+        )
+    except:
+        pass
+
+    # /start
+    try:
+        await context.bot.delete_message(
+            chat_id=update.message.chat_id,
+            message_id=data.get("start_msg_id")
         )
     except:
         pass
